@@ -2,7 +2,8 @@ from .player import PlayerManager
 from .song  import *
 from .quest import QuestPool
 from .event import RandomEvent
-from .utils import GameplayError
+from .card import RandomCard
+from .utils import GameplayError, log
 from functools import cmp_to_key
 
 class Game:
@@ -15,7 +16,7 @@ class Game:
     STATUS_105_EVALUATE_BET = 105
     STATUS_200_FINISHED = 200
 
-    def __init__(self, game_type='arcaea', turns=5, random_p=0.5):
+    def __init__(self, game_type='arcaea', turns=5, random_p=0.5, random_card=False):
         if game_type == "arcaea":
             self.song_manager = ArcaeaSongPackageManager()
         elif game_type == "phigros":
@@ -26,6 +27,7 @@ class Game:
         self.__quest_pool = QuestPool()
         self.__turns = turns
         self.__random_event = RandomEvent(self.__play_manager, game_type=game_type, random_p=random_p)
+        self.__random_card = RandomCard(self.__play_manager, game_type=game_type, random_card=random_card)
         self.reset_round(turns)
 
     @property
@@ -55,6 +57,7 @@ class Game:
         self.__turns = turn
         self.__winner = None
         self.__current_quest = None
+        self.__current_card = self.__random_card.default_card()
         self.__status = self.STATUS_000_UNAVAILABLE
         self.__play_manager.reset_round()
         self.reset_turn()
@@ -64,9 +67,6 @@ class Game:
         self.__current_quest = None
         self.__bet_num = 0
         self.__gameplay_num = 0
-
-    def log(self, s:str):
-        pass
 
     # helper function
     def check_status(self, status):
@@ -105,8 +105,9 @@ class Game:
     # game play
     def start(self):
         self.player_num = self.__play_manager.player_num
+        self.__random_card.set_player_list(*self.__play_manager.player_list)
         self.__status = self.STATUS_100_DRAW_EVENT
-        self.log(f'Starting game with {self.__turns} turns.')
+        log(f'Starting game with {self.__turns} turns.')
 
     def draw_event(self):
         self.check_status(self.STATUS_100_DRAW_EVENT)
@@ -127,9 +128,9 @@ class Game:
         self.__status = self.STATUS_102_BET
 
         if redraw:
-            self.log(f'Redrawing quest: {self.__current_quest.description}.')
+            log(f'Redrawing quest: {self.__current_quest.description}.')
         else:
-            self.log(f'{self.__turns} turn{"s" if self.__turns > 1 else ""} left. Drawing quest: {self.__current_quest.description}.')
+            log(f'{self.__turns} turn{"s" if self.__turns > 1 else ""} left. Drawing quest: {self.__current_quest.description}.')
 
     def bet(self, player_id, bet_id, stake=1):
         if self.__status == self.STATUS_103_PLAY:
@@ -143,7 +144,7 @@ class Game:
             if bet_id:
                 bet_player = self.__play_manager.find_player(bet_id)
                 if (bet_player.id == player.id):
-                    raise GameplayError(f'Cannoe bet oneself: {bet_player.id}')
+                    raise GameplayError(f'Cannot bet oneself: {bet_player.id}')
             player.took_bet = True
             self.__bet_num += 1
 
@@ -153,7 +154,18 @@ class Game:
 
         if self.__bet_num == self.player_num:
             self.__status = self.STATUS_103_PLAY
-        self.log(f'Player {player.id} bets {stake} point{"s" if stake > 1 else ""} on {bet_id}.')
+        log(f'Player {player.id} bets {stake} point{"s" if stake > 1 else ""} on {bet_id}.')
+
+    def draw_card(self, player_id):
+        player = self.__play_manager.find_player(player_id)
+        self.__random_card.add_pending_queue(player)
+
+    def show_card(self):
+        temp_card = self.__random_card.print_card()
+        self.__play_manager.card_bought_deduct(temp_card.user_deduct_list)
+        log(f'Player {self.__card.user} get card {self.__card.description}.')
+        if input('Use card? [Y/N]').lower() == 'y':
+            self.__card = temp_card
 
     def play(self, player_id, score):
         if (self.__status != self.STATUS_104_EVALUATE_SCORE):
@@ -167,19 +179,23 @@ class Game:
         
         if self.__gameplay_num == self.player_num:
             self.__status = self.STATUS_104_EVALUATE_SCORE
-        self.log(f'Player {player.id} plays the quest with score "{score}".')
+        log(f'Player {player.id} plays the quest with score "{score}".')
 
     def evaluate_score(self):
         self.check_status(self.STATUS_104_EVALUATE_SCORE)
         self.__status = self.STATUS_105_EVALUATE_BET
-        self.__play_manager.evaluate_playing_score()
-        self.log(str(self))        
+        self.__play_manager.preprocess_playing_score(self.__card.score_preprocess)
+        self.__play_manager.evaluate_playing_score(self.__card.score_rank_cmp)
+        log(str(self))        
 
     def evaluate_bet(self):
         self.check_status(self.STATUS_105_EVALUATE_BET)
+        self.__play_manager.preprocess_bet_target()
+        self.__play_manager.evaluate_bet_deduct()
         self.__play_manager.evaluate_bet_score()
-        self.log(str(self))
+        log(str(self))
         self.__turns -= 1
+        self.__random_card.set_player_list(*self.__play_manager.player_list)
         self.reset_turn()
         if self.__turns <= 0:
             self.__status = self.STATUS_200_FINISHED

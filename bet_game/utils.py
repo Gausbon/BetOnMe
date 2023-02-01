@@ -64,6 +64,13 @@ class TrieNode:
                 self.children[id[0]] = TrieNode()
             child = self.children[id[0]]
             child.insert(id[1:], player)
+
+
+def log(s:str):
+    print(s)
+
+
+
 '''
 def check_ndarray(value):
     if not isinstance(value, _np.ndarray):

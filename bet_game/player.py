@@ -1,4 +1,5 @@
 from functools import cmp_to_key
+from math import floor
 from .utils import TrieNode, GameplayError
 
 class Player:
@@ -113,22 +114,7 @@ class PlayerManager:
             if pt > 0:
                 pt -= 1
 
-    # evaluate function
-    def evaluate_playing_score(self):
-        self.player_list = sorted(self.player_list, reverse=True, 
-            key=cmp_to_key(self.ranking_cmp))
-        if self.betted_decrease:
-            for player in self.player_list:
-                if player.bet_id:
-                    bet_player = self.find_player(player.bet_id)
-                    bet_player.score -= 1
-                    if bet_player.betted is None:
-                        bet_player.betted = 1
-                    else:
-                        bet_player.betted += 1
-        self.rank_to_score(self.player_list)
-        
-    def evaluate_bet_score(self):
+    def default_score_evaluate(self, *player_list):
         self.player_list = sorted(self.player_list, reverse=True)
         max_score = self.player_list[0].score
         score_list = [0 for _ in range(self.player_num)]
@@ -148,7 +134,50 @@ class PlayerManager:
             
             player.bet_reward = score_list[i]
             player.score += score_list[i]
-        
+
+
+    # evaluate function
+    def preprocess_playing_score(self, process_func):
+        'process_func(*player_list) -> new_list   # Finish processing inside func'
+        self.player_list = process_func(self.player_list)
+
+    # sort play score
+    def evaluate_playing_score(self, sort_func=default_ranking_cmp):
+        'sort_func(a:Player, b:Player) -> compare_result'
+        self.player_list = sorted(self.player_list, reverse=True, 
+            key=cmp_to_key(sort_func))
+        self.rank_to_score(self.player_list)
+
+    # buy card cost
+    def card_bought_deduct(self, *deduct_list):
+        half_score = (len(self.player_list)+1)//2
+        for player in deduct_list:
+            player.score -= half_score
+    
+    # bet target rearrange
+    def preprocess_bet_target(self, process_func):
+        'process_func(*player_list) -> new_list   # Finish processing inside func'
+        self.player_list = process_func(self.player_list)
+
+    # deduct bet target score
+    def evaluate_bet_deduct(self, evaluate_func):
+        'evaluate_func(*player_list) -> new_list   # Finish processing inside func'
+        self.player_list = evaluate_func(self.player_list)
+
+    # effects before bet score calculate
+    def preprocess_bet_score(self, evaluate_func):
+        'evaluate_func(*player_list) -> new_list   # Finish processing inside func'
+        self.player_list = evaluate_func(self.player_list)
+
+    # calculate bet score
+    def evaluate_bet_score(self, func_evaluate=default_score_evaluate):
+        self.player_list = func_evaluate()
+
+    # effects after bet score calculate
+    def postprocess_bet_score(self, evaluate_func):
+        'evaluate_func(*player_list) -> new_list   # Finish processing inside func'
+        self.player_list = evaluate_func(self.player_list)
+        self.rank_to_score(self.player_list)
         self.player_list = sorted(self.player_list, reverse=True)
 
     @property
