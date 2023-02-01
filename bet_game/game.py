@@ -16,7 +16,7 @@ class Game:
     STATUS_105_EVALUATE_BET = 105
     STATUS_200_FINISHED = 200
 
-    def __init__(self, game_type='arcaea', turns=5, random_p=0, random_card=False):
+    def __init__(self, game_type='arcaea', turns=5, random_p=0.5, random_card=False):
         if game_type == "arcaea":
             self.song_manager = ArcaeaSongPackageManager()
         elif game_type == "phigros":

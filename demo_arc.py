@@ -15,7 +15,7 @@ regular_quests = [
     'ban', 'ifi',
 ]
 
-game = Game('arcaea', turns=2, random_card=True)
+game = Game('arcaea', turns=2, random_p=0, random_card=True)
 game.enable('core')
 game.enable('rei')
 game.enable('yugamu')
@@ -93,7 +93,7 @@ if game.finished:
 else:
     print(f'Game is not finished. remaining turn: {game.turns}!')
 
-game.reset_round(1)
+""" game.reset_round(1)
 game.enroll('p5555')
 game.enroll('p6666')
 game.remove('p3333')
@@ -135,4 +135,4 @@ print(game, '\n')
 if game.finished:
     print(f'Game is finished. Congratulations to the winner: {game.winner}!')
 else:
-    print(f'Game is not finished. remaining turn: {game.turns}!')
+    print(f'Game is not finished. remaining turn: {game.turns}!') """
