@@ -15,7 +15,7 @@ regular_quests = [
     'ban', 'ifi',
 ]
 
-game = Game('arcaea', turns=2)
+game = Game('arcaea', turns=2, random_card=True)
 game.enable('core')
 game.enable('rei')
 game.enable('yugamu')
@@ -65,11 +65,12 @@ game.draw_quest()
 print(game, '\n')
 
 game.bet('p1', None)
-# rebet
-game.bet('p1', 'p2', 1)
+game.draw_card('p1')
 game.bet('p2', 'p1', 3)
-game.bet('p3', 'p1', 3)
+game.draw_card('p3')
 game.bet('p4', 'p1', 3)
+
+game.show_card()
 
 game.play('p1', 0)
 # replay

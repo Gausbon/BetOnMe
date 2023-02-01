@@ -16,7 +16,7 @@ class Game:
     STATUS_105_EVALUATE_BET = 105
     STATUS_200_FINISHED = 200
 
-    def __init__(self, game_type='arcaea', turns=5, random_p=0.5, random_card=False):
+    def __init__(self, game_type='arcaea', turns=5, random_p=0, random_card=False):
         if game_type == "arcaea":
             self.song_manager = ArcaeaSongPackageManager()
         elif game_type == "phigros":
@@ -27,7 +27,7 @@ class Game:
         self.__quest_pool = QuestPool()
         self.__turns = turns
         self.__random_event = RandomEvent(self.__play_manager, game_type=game_type, random_p=random_p)
-        self.__random_card = RandomCard(self.__play_manager, game_type=game_type, random_card=random_card)
+        self.__random_card = RandomCard(game_type=game_type, random_card=random_card)
         self.reset_round(turns)
 
     @property
@@ -105,7 +105,7 @@ class Game:
     # game play
     def start(self):
         self.player_num = self.__play_manager.player_num
-        self.__random_card.set_player_list(*self.__play_manager.player_list)
+        self.__random_card.set_player_list(self.__play_manager.player_list)
         self.__status = self.STATUS_100_DRAW_EVENT
         log(f'Starting game with {self.__turns} turns.')
 
@@ -140,16 +140,19 @@ class Game:
             self.check_status(self.STATUS_102_BET)
     
         player = self.__play_manager.find_player(player_id)
+        bet_id_actual = ''
         if not player.took_bet:
             if bet_id:
                 bet_player = self.__play_manager.find_player(bet_id)
                 if (bet_player.id == player.id):
                     raise GameplayError(f'Cannot bet oneself: {bet_player.id}')
+                bet_id_actual = bet_player.id
             player.took_bet = True
             self.__bet_num += 1
 
         player.bet_id = bet_id
         if bet_id:
+            player.bet_id = bet_id_actual
             player.stake = max(min(stake, self.player_num), 1)
 
         if self.__bet_num == self.player_num:
@@ -159,13 +162,16 @@ class Game:
     def draw_card(self, player_id):
         player = self.__play_manager.find_player(player_id)
         self.__random_card.add_pending_queue(player)
+        self.__bet_num += 1
+        if self.__bet_num == self.player_num:
+            self.__status = self.STATUS_103_PLAY
 
     def show_card(self):
         temp_card = self.__random_card.print_card()
         self.__play_manager.card_bought_deduct(temp_card.user_deduct_list)
-        log(f'Player {self.__card.user} get card {self.__card.description}.')
+        log(f'Player {temp_card.user} get card {temp_card.description}.')
         if input('Use card? [Y/N]').lower() == 'y':
-            self.__card = temp_card
+            self.__current_card = temp_card
 
     def play(self, player_id, score):
         if (self.__status != self.STATUS_104_EVALUATE_SCORE):
@@ -184,18 +190,21 @@ class Game:
     def evaluate_score(self):
         self.check_status(self.STATUS_104_EVALUATE_SCORE)
         self.__status = self.STATUS_105_EVALUATE_BET
-        self.__play_manager.preprocess_playing_score(self.__card.score_preprocess)
-        self.__play_manager.evaluate_playing_score(self.__card.score_rank_cmp)
+        self.__play_manager.card_bought_deduct(self.__current_card.user_deduct_list)
+        self.__play_manager.preprocess_playing_score(self.__current_card.playing_score_preprocess)
+        self.__play_manager.evaluate_playing_score(self.__current_card.score_rank_cmp)
         log(str(self))        
 
     def evaluate_bet(self):
         self.check_status(self.STATUS_105_EVALUATE_BET)
-        self.__play_manager.preprocess_bet_target()
-        self.__play_manager.evaluate_bet_deduct()
-        self.__play_manager.evaluate_bet_score()
+        self.__play_manager.preprocess_bet_target(self.__current_card.target_rearrange)
+        self.__play_manager.evaluate_bet_deduct(self.__current_card.bet_deduct)
+        self.__play_manager.preprocess_bet_score(self.__current_card.bet_score_preprocess)
+        self.__play_manager.evaluate_bet_score(self.__current_card.bet_score_evaluate)
+        self.__play_manager.postprocess_bet_score(self.__current_card.bet_score_postprocess)
         log(str(self))
         self.__turns -= 1
-        self.__random_card.set_player_list(*self.__play_manager.player_list)
+        self.__random_card.set_player_list(self.__play_manager.player_list)
         self.reset_turn()
         if self.__turns <= 0:
             self.__status = self.STATUS_200_FINISHED
