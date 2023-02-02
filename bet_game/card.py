@@ -172,8 +172,11 @@ class RandomCard:
             raise GameplayError('Invalid operation. Random card is not activated in the current game.')
         else:
             self.__status = self.STATUS_111_CARD_CALL
-            self.card_pending_list.append(player)
-            log(f'Player {player.id} uses {floor(len(self.player_rank_list)/2)} points trying to buy a random card.')
+            if player.score >= floor(len(self.player_rank_list)/2):
+                self.card_pending_list.append(player)
+                log(f'Player {player.id} uses {floor(len(self.player_rank_list)/2)} points trying to buy a random card.')
+            else:
+                log(f'Player {player.id} doesn\'t have enough points to buy a random card!')
     
     def print_card(self) -> CardInstance:
         if self.__status == self.STATUS_000_CARD_UNAVAILABLE:

@@ -13,7 +13,7 @@ regular_quests = [
     'ban', 'Introduction',
 ]
 
-game = Game('phigros', turns=2)
+game = Game('phigros', turns=2, random_p=0, random_card=True)
 game.enable_all()
 game.disable('ez')
 game.disable('hd')
@@ -28,7 +28,6 @@ game.start()
 # turn 1
 game.draw_event()
 game.draw_quest()
-print(game, '\n')
 
 game.bet('p1', 'p2', 2)
 game.bet('p2', 'p3', 1)
@@ -43,10 +42,8 @@ game.play('p4', 9500000)
 game.play('p4', 9800000)
 
 game.evaluate_score()
-print(game, '\n')
 
 game.evaluate_bet()
-print(game, '\n')
 
 # turn 2
 game.draw_event()
