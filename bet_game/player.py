@@ -166,7 +166,7 @@ class PlayerManager:
     # buy card cost
     def card_bought_deduct(self, deduct_list):
         if len(deduct_list):
-            half_score = (len(self.player_list)+1)//2
+            half_score = floor(len(self.player_list)/2)
             for player in deduct_list:
                 player.score -= half_score
                 player.card_spent = half_score

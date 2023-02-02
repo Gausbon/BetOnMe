@@ -60,13 +60,13 @@ class Game:
         self.__turns = turn
         self.__winner = None
         self.__current_quest = None
-        self.__current_card = self.__random_card.default_card()
         self.__status = self.STATUS_000_UNAVAILABLE
         self.__play_manager.reset_round()
         self.reset_turn()
 
     def reset_turn(self):
         self.__play_manager.reset_turn()
+        self.__current_card = self.__random_card.default_card()
         self.__current_quest = None
         self.__bet_num = 0
         self.__gameplay_num = 0

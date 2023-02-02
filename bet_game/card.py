@@ -181,10 +181,14 @@ class RandomCard:
     def print_card(self) -> CardInstance:
         if self.__status == self.STATUS_000_CARD_UNAVAILABLE:
             raise GameplayError('Invalid operation. Random card is not activated in the current game.')
+        elif not len(self.card_pending_list):
+            log(f'No user ordered card.')
+            return self.default_card()
         else:
             self.card_pending_list = sorted(self.card_pending_list,
              reverse=True, key=cmp_to_key(score_cmp))
-            card_func = random.choice(self.cards)
+            card_int = random.randint(0, 7)
+            card_func = self.cards[card_int]
             self.__card = card_func(user=self.card_pending_list[0])
             self.__card.user_deduct_list = self.card_pending_list
             self.__status = self.STATUS_112_CARD_DETERMINED
