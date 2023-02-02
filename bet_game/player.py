@@ -20,7 +20,8 @@ class Player:
         self.bet_reward = None # Points that the player earned in this turn's bet.
         self.card_spent = None # Points that the player spent on buying random cards.
         self.card_reward = None # Points that the player earned on card events.
-        self.card_reward_merged = False # Was card reward calculated?
+        self.card_reward_merged = False # If card reward has been calculated. 
+                                        # Only used for distingushing phases in __str__
 
         self.played = False # Did the player submit the playscore?
         self.playing_score = None # This round's playscore.
