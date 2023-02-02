@@ -174,11 +174,10 @@ class PlayerManager:
     
     # evaluate function
     def preprocess_playing_score(self, process_func):
-        'process_func(player_list) -> new_list   # Finish processing inside func'
         self.player_list = process_func(self.player_list)
 
     # sort play score
-    def evaluate_playing_score(self, sort_func=default_ranking_cmp):
+    def evaluate_playing_score(self, sort_func):
         'sort_func(a:Player, b:Player) -> compare_result'
         self.player_list = sorted(self.player_list, reverse=True, 
             key=cmp_to_key(sort_func))
@@ -186,26 +185,22 @@ class PlayerManager:
     
     # bet target rearrange
     def preprocess_bet_target(self, process_func):
-        'process_func(player_list) -> new_list   # Finish processing inside func'
         self.player_list = process_func(self.player_list)
 
     # deduct bet target score
     def evaluate_bet_deduct(self, evaluate_func):
-        'evaluate_func(player_list) -> new_list   # Finish processing inside func'
         self.player_list = evaluate_func(self.player_list)
 
     # effects before bet score calculate
     def preprocess_bet_score(self, evaluate_func):
-        'evaluate_func(player_list) -> new_list   # Finish processing inside func'
         self.player_list = evaluate_func(self.player_list)
 
     # calculate bet score
-    def evaluate_bet_score(self, func_evaluate=default_score_evaluate):
+    def evaluate_bet_score(self, func_evaluate):
         self.player_list = func_evaluate(self.player_list)
 
     # effects after bet score calculate
     def postprocess_bet_score(self, evaluate_func):
-        'evaluate_func(player_list) -> new_list   # Finish processing inside func'
         self.player_list = evaluate_func(self.player_list)
         self.player_list = sorted(self.player_list, reverse=True)
 
