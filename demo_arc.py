@@ -35,9 +35,8 @@ game.start()
 # turn 1
 game.draw_event()
 game.draw_quest()
-print(game, '\n')
 
-game.bet('p1', 'p2', 2)
+game.bet('p1', 'p2', 1)
 game.bet('p2', 'p3', 1)
 game.bet('p3', 'p1', 1)
 game.bet('p4', 'p1', 1)
@@ -50,24 +49,19 @@ game.play('p4', 9500000)
 game.play('p4', 9800000)
 
 game.evaluate_score()
-print(game, '\n')
 
 game.evaluate_bet()
-print(game, '\n')
 
 # turn 2
 game.draw_event()
 game.draw_quest()
-print(game, '\n')
 
 # redraw
 game.draw_quest()
-print(game, '\n')
 
-game.bet('p1', None)
 game.draw_card('p1')
 game.bet('p2', 'p1', 3)
-game.draw_card('p3')
+game.bet('p3', None)
 game.bet('p4', 'p1', 3)
 
 game.show_card()
@@ -81,11 +75,7 @@ game.play('p4', 9800000)
 
 game.evaluate_score()
 
-print(game, '\n')
-
 game.evaluate_bet()
-
-print(game, '\n')
 
 # game finished
 if game.finished:

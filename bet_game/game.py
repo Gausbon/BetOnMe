@@ -3,7 +3,7 @@ from .song  import *
 from .quest import QuestPool
 from .event import RandomEvent
 from .card import RandomCard
-from .utils import GameplayError, log
+from .utils import GameplayError, log, divideline
 from functools import cmp_to_key
 
 class Game:
@@ -12,8 +12,11 @@ class Game:
     STATUS_101_DRAW_QUEST = 101
     STATUS_102_BET = 102
     STATUS_103_PLAY = 103
+    STATUS_1031_CARD_DECIDE = 1031
     STATUS_104_EVALUATE_SCORE = 104
-    STATUS_105_EVALUATE_BET = 105
+    STATUS_105_BET_DEDUCT = 105
+    STATUS_106_EVALUATE_BET = 106
+    STATUS_107_EVALUATE_CARD = 107
     STATUS_200_FINISHED = 200
 
     def __init__(self, game_type='arcaea', turns=5, random_p=0.5, random_card=False):
@@ -138,6 +141,8 @@ class Game:
                 raise GameplayError(f'Cannot re-bet. Some players have already played')
         else:
             self.check_status(self.STATUS_102_BET)
+            if not self.__bet_num:
+                divideline()
     
         player = self.__play_manager.find_player(player_id)
         bet_id_actual = ''
@@ -154,12 +159,21 @@ class Game:
         if bet_id:
             player.bet_id = bet_id_actual
             player.stake = max(min(stake, self.player_num), 1)
+            log(f'Player {player.id} bets {stake} point{"s" if stake > 1 else ""} on {bet_id}.')
+        else:
+            log(f'Player {player.id} doesn\'t take bet this turn.')
 
         if self.__bet_num == self.player_num:
             self.__status = self.STATUS_103_PLAY
-        log(f'Player {player.id} bets {stake} point{"s" if stake > 1 else ""} on {bet_id}.')
-
+        
     def draw_card(self, player_id):
+        if self.__status == self.STATUS_103_PLAY:
+            if self.__gameplay_num != 0:
+                raise GameplayError(f'Cannot buy random card. Some players have already played')
+        else:
+            self.check_status(self.STATUS_102_BET)
+            if not self.__bet_num:
+                divideline()
         player = self.__play_manager.find_player(player_id)
         self.__random_card.add_pending_queue(player)
         self.__bet_num += 1
@@ -167,15 +181,25 @@ class Game:
             self.__status = self.STATUS_103_PLAY
 
     def show_card(self):
+        if (self.__status != self.STATUS_104_EVALUATE_SCORE):
+            self.check_status(self.STATUS_103_PLAY)
+        divideline()
+        self.__status = self.STATUS_1031_CARD_DECIDE
         temp_card = self.__random_card.print_card()
         self.__play_manager.card_bought_deduct(temp_card.user_deduct_list)
         log(f'Player {temp_card.user} get card {temp_card.description}.')
-        if input('Use card? [Y/N]').lower() == 'y':
+        if input('Use card? [Y/N] ').lower() == 'y':
             self.__current_card = temp_card
+        divideline()
+        log(str(self))
+        self.__status = self.STATUS_103_PLAY
+        
 
     def play(self, player_id, score):
         if (self.__status != self.STATUS_104_EVALUATE_SCORE):
             self.check_status(self.STATUS_103_PLAY)
+            if not self.__gameplay_num:
+                divideline()
         player = self.__play_manager.find_player(player_id)
         self.__play_manager.set_score(player, score)
         
@@ -189,20 +213,32 @@ class Game:
 
     def evaluate_score(self):
         self.check_status(self.STATUS_104_EVALUATE_SCORE)
-        self.__status = self.STATUS_105_EVALUATE_BET
-        self.__play_manager.card_bought_deduct(self.__current_card.user_deduct_list)
+        divideline()
         self.__play_manager.preprocess_playing_score(self.__current_card.playing_score_preprocess)
         self.__play_manager.evaluate_playing_score(self.__current_card.score_rank_cmp)
-        log(str(self))        
+        log(str(self))
+        divideline()
+        self.__status = self.STATUS_105_BET_DEDUCT    
 
     def evaluate_bet(self):
-        self.check_status(self.STATUS_105_EVALUATE_BET)
+        self.check_status(self.STATUS_105_BET_DEDUCT)
         self.__play_manager.preprocess_bet_target(self.__current_card.target_rearrange)
         self.__play_manager.evaluate_bet_deduct(self.__current_card.bet_deduct)
+        log(str(self))
+        divideline()
+
+        self.__status = self.STATUS_106_EVALUATE_BET
         self.__play_manager.preprocess_bet_score(self.__current_card.bet_score_preprocess)
         self.__play_manager.evaluate_bet_score(self.__current_card.bet_score_evaluate)
+        log(str(self))
+        divideline()
+
+        self.__status = self.STATUS_107_EVALUATE_CARD
         self.__play_manager.postprocess_bet_score(self.__current_card.bet_score_postprocess)
         log(str(self))
+        divideline()
+        divideline()
+
         self.__turns -= 1
         self.__random_card.set_player_list(self.__play_manager.player_list)
         self.reset_turn()
@@ -221,17 +257,41 @@ class Game:
             head = f'Drawing the next quest.\n'
         elif self.__status == self.STATUS_102_BET:
             head = f'The quest is {self.__current_quest.description}. Players are betting.\n'
+        elif self.__status == self.STATUS_1031_CARD_DECIDE:
+            head = f'Final bet & card results are:\n'
         elif self.__status == self.STATUS_103_PLAY:
             head = f'Playing {self.__current_quest.description}.\n'
         elif self.__status == self.STATUS_104_EVALUATE_SCORE:
             head = f'Evaluating scores of {self.__current_quest.description}.\n'
-        elif self.__status == self.STATUS_105_EVALUATE_BET:
+        elif self.__status == self.STATUS_105_BET_DEDUCT:
+            head = f'Evaluating bet target deducts.\n'
+        elif self.__status == self.STATUS_106_EVALUATE_BET:
             head = f'Evaluating bet results.\n'
-        if self.__status == self.STATUS_105_EVALUATE_BET:
+        elif self.__status == self.STATUS_107_EVALUATE_CARD:
+            head = f'Evaluating random card effects.\n'
+
+        if self.__status == self.STATUS_1031_CARD_DECIDE:
+            player_infos = []
+            for player in sorted(self.__play_manager.player_list, reverse=True,
+                    key=cmp_to_key(self.__play_manager.score_cmp)):
+                if player.bet_id:
+                    player_infos.append(f'{player} {"bets " + str(player.stake) + " point(s) on " + player.bet_id}')
+                elif player.card_spent:
+                    player_infos.append(f'{player} {"spends " + str(player.card_spent) + " point(s) on random card."}')
+                else:
+                    player_infos.append(f'{player} {"not betting"}')
+        elif self.__status == self.STATUS_104_EVALUATE_SCORE:
             player_infos = [
-                f'{player} (result: {player.playing_score}) {"bets " + str(player.stake) + " point(s) on " + player.bet_id if player.bet_id else "not betting"}'
+                f'{player} (result: {player.playing_score})'
                 for player in sorted(self.__play_manager.player_list, reverse=True,
-                    key=cmp_to_key(self.__play_manager.ranking_cmp))
+                    key=cmp_to_key(self.__play_manager.playscore_cmp))
+            ]
+        elif self.__status == self.STATUS_105_BET_DEDUCT or \
+            self.__status == self.STATUS_106_EVALUATE_BET:
+            player_infos = [
+                f'{player} {"bets " + str(player.stake) + " point(s) on " + player.bet_id if player.bet_id else "not betting"}'
+                for player in sorted(self.__play_manager.player_list, reverse=True,
+                    key=cmp_to_key(self.__play_manager.score_cmp))
             ]
         else:
             player_infos = [f'{player}' for player in self.__play_manager.player_list]

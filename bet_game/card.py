@@ -4,6 +4,27 @@ import random
 from math import floor, ceil
 from functools import cmp_to_key
 
+# cmp funcs
+def score_cmp(a:Player, b:Player):
+    if a.score != b.score:
+        return a.score - b.score
+    else:
+        return a.id > b.id
+
+def playing_score_cmp(a:Player, b:Player):
+    if not a.rank is None and not b.rank is None and a.rank != b.rank:
+        return b.rank - a.rank
+    elif a.playing_score != b.playing_score:
+        return a.playing_score - b.playing_score
+    else:
+        return a.id > b.id
+
+
+def search_player(id, player_list):
+    for player in player_list:
+        if player.id == id:
+            return player
+
 class CardInstance:
     def __init__(
         self,
@@ -53,33 +74,29 @@ class CardInstance:
         deduct_list = player_list
         for player in deduct_list:
             if player.bet_id:
-                bet_player = self.search_player(player.bet_id, deduct_list)
+                bet_player = search_player(player.bet_id, deduct_list)
                 bet_player.score -= 1
                 if bet_player.betted is None:
                     bet_player.betted = 1
                 else:
                     bet_player.betted += 1
+        for player in deduct_list:
+            if player.betted is None:
+                player.betted = 0
+        deduct_list = sorted(deduct_list, reverse=True, key=cmp_to_key(score_cmp))
         return deduct_list
 
     def default_bet_score_preprocess(self, player_list):
         return player_list
     
     def default_bet_score_evaluate(self, player_list):
-        def score_cmp(a:Player, b:Player):
-            if not a.rank is None and not b.rank is None and a.rank != b.rank:
-                return b.rank - a.rank
-            elif a.score != b.score:
-                return b.score - a.score
-            else:
-                return a.id > b.id
-
         evaluate_list = sorted(player_list, reverse=True, key=cmp_to_key(score_cmp))
         max_score = evaluate_list[0].score
         score_list = [0 for _ in range(len(evaluate_list))]
 
         for i, player in enumerate(evaluate_list):
             if player.bet_id:
-                bet_player = self.search_player(player.bet_id, evaluate_list)
+                bet_player = search_player(player.bet_id, evaluate_list)
                 if bet_player.score == max_score:
                     score_list[i] = player.stake
                 else:
@@ -88,18 +105,17 @@ class CardInstance:
         for i, player in enumerate(evaluate_list):
             player.bet_reward = score_list[i]
             player.score += score_list[i]
+        evaluate_list = sorted(evaluate_list, reverse=True, key=cmp_to_key(score_cmp))
         return evaluate_list
 
     def default_bet_score_postprocess(self, player_list):
-        return player_list
-
-
-    # Utils
-    def search_player(self, id, player_list):
-        for player in player_list:
-            if player.id == id:
-                return player
-
+        postprocess_list = player_list
+        for player in postprocess_list:
+            if not player.card_reward is None:
+                player.card_reward_merged = True
+                player.score += player.card_reward
+        postprocess_list = sorted(player_list, reverse=True, key=cmp_to_key(score_cmp))
+        return postprocess_list
 
 class RandomCard:
     STATUS_000_CARD_UNAVAILABLE = 000
@@ -147,7 +163,8 @@ class RandomCard:
         return card
 
     def set_player_list(self, player_list):
-        self.player_rank_list = sorted(player_list, reverse=True, key=cmp_to_key(self.score_cmp))
+        self.player_rank_list = sorted(player_list, reverse=True,
+         key=cmp_to_key(score_cmp))
         self.card_pending_list = []
 
     def add_pending_queue(self, player:Player):
@@ -163,22 +180,13 @@ class RandomCard:
             raise GameplayError('Invalid operation. Random card is not activated in the current game.')
         else:
             self.card_pending_list = sorted(self.card_pending_list,
-             reverse=True, key=cmp_to_key(self.score_cmp))
-            #card_func = random.choice(self.cards)
-            card_func = self.fake_card
+             reverse=True, key=cmp_to_key(score_cmp))
+            card_func = random.choice(self.cards)
             self.__card = card_func(user=self.card_pending_list[0])
             self.__card.user_deduct_list = self.card_pending_list
             self.__status = self.STATUS_112_CARD_DETERMINED
             return self.__card
-
-    def score_cmp(self, a:Player, b:Player):
-        if not a.rank is None and not b.rank is None and a.rank != b.rank:
-            return b.rank - a.rank
-        elif a.score != b.score:
-            return b.score - a.score
-        else:
-            return a.id > b.id
-
+    
     # Card details
     def target_shift(self, user) -> CardInstance:
         _desc = "所有对他人下注的目标按上轮总分位次将目标后移一个人"
@@ -190,6 +198,7 @@ class RandomCard:
                     for i, _player in enumerate(self.player_rank_list):
                         if _player.id == player.bet_id:
                             player.bet_id = self.player_rank_list[(i+1)%len(self.player_rank_list)].id
+                            break
             return rearrange_list
 
         card = CardInstance(
@@ -203,22 +212,6 @@ class RandomCard:
         _desc = "若目标为你的下注都失败了，在赌注结算环节后将这些下注总分将平均分给你和所有这次打歌得零分的人"
         _user = user
 
-        def score_cmp(a:Player, b:Player):
-            if not a.rank is None and not b.rank is None and a.rank != b.rank:
-                return b.rank - a.rank
-            elif a.score != b.score:
-                return b.score - a.score
-            else:
-                return a.id > b.id
-
-        def playing_score_cmp(a:Player, b:Player):
-            if not a.rank is None and not b.rank is None and a.rank != b.rank:
-                return b.rank - a.rank
-            elif a.playing_score != b.playing_score:
-                return a.playing_score - b.playing_score
-            else:
-                return a.id > b.id
-
         def _bet_score_evaluate(player_list):
             playing_score_evaluate_list = sorted(player_list, reverse=True,
               key=cmp_to_key(playing_score_cmp))
@@ -229,14 +222,15 @@ class RandomCard:
                 else:
                     if player.id == _user.id:
                         score_reward_list.append(player)
-            score_evaluate_list = sorted(player_list, reverse=True)
+            score_evaluate_list = sorted(player_list, reverse=True,
+             key=cmp_to_key(score_cmp))
             max_score = score_evaluate_list[0].score
             score_list = [0 for _ in range(len(score_evaluate_list))]
             score_pool = 0
 
             for i, player in enumerate(score_evaluate_list):
                 if player.bet_id:
-                    bet_player = CardInstance.search_player(player.bet_id, score_evaluate_list)
+                    bet_player = search_player(player.bet_id, score_evaluate_list)
                     if bet_player.score == max_score:
                         score_list[i] = player.stake
                     else:
@@ -250,7 +244,7 @@ class RandomCard:
                 player.score += score_list[i]
                 for _player in score_reward_list:
                     if player.id == _player.id:
-                        player.score += score_reward
+                        player.card_reward = score_reward
             return score_evaluate_list
         
         card = CardInstance(
@@ -268,13 +262,13 @@ class RandomCard:
             process_list = player_list
             for player in process_list:
                 if not player.bet_id:
-                    player.score += ceil(len(player_list)/4)
+                    player.card_reward = ceil(len(player_list)/4)
             return process_list
         
         card = CardInstance(
             description=_desc,
             user=_user,
-            score_preprocess=_bet_score_preprocess
+            bet_score_preprocess=_bet_score_preprocess
         )
         return card
     
@@ -288,14 +282,14 @@ class RandomCard:
 
             for i, player in enumerate(evaluate_list):
                 if player.bet_id:
-                    bet_player = CardInstance.search_player(player.bet_id)
+                    bet_player = search_player(player.bet_id, evaluate_list)
                     if bet_player.score == max_score:
                         score_list[i] = player.stake
 
             for i, player in enumerate(evaluate_list):
                 player.bet_reward = score_list[i]
                 player.score += score_list[i]
-            
+            evaluate_list = sorted(evaluate_list, reverse=True, key=cmp_to_key(score_cmp))
             return evaluate_list
 
         card = CardInstance(

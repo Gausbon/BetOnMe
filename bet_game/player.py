@@ -13,31 +13,43 @@ class Player:
         self.reset_turn()
         
     def reset_turn(self):
-        self.took_bet = False
-        self.bet_id = None
-        self.bet_score = None
-        self.betted = None
-        self.bet_reward = None
+        self.took_bet = False # Had player bet somebody else?
+        self.bet_id = None # Who had the player bet?
+        self.stake = None # This round's stake.
+        self.betted = None # How many people betted on the player? (For deduct)
+        self.bet_reward = None # Points that the player earned in this turn's bet.
+        self.card_spent = None # Points that the player spent on buying random cards.
+        self.card_reward = None # Points that the player earned on card events.
+        self.card_reward_merged = False # Was card reward calculated?
 
-        self.played = False
-        self.playing_score = None
-        self.cur_pt = None
-        self.rank = None
+        self.played = False # Did the player submit the playscore?
+        self.playing_score = None # This round's playscore.
+        self.rank = None # The player's rank in this turn's playing.
+        self.cur_pt = None # Points that the player earned in this turn's playing.
 
     def __lt__(self, other):
         return self.score < other.score
 
     def __str__(self):
-        if not self.betted is None:
-            return f'{self.id} ({self.score+self.betted-self.cur_pt}+{self.cur_pt}-{self.betted}={self.score})'
-        elif not self.cur_pt is None:
-            return f'{self.id} ({self.score-self.cur_pt}+{self.cur_pt}={self.score})'
-        elif not self.bet_reward is None:
+        if self.card_reward_merged: # After bet eval + card award
+            if self.bet_reward < 0:
+                return f'{self.id} ({self.score-self.bet_reward-self.card_reward}-{-self.bet_reward}+{self.card_reward}={self.score})'
+            else:
+                return f'{self.id} ({self.score-self.bet_reward-self.card_reward}+{self.bet_reward}+{self.card_reward}={self.score})'
+        elif not self.bet_reward is None: # After bet eval + without card reward
             if self.bet_reward < 0:
                 return f'{self.id} ({self.score-self.bet_reward}-{-self.bet_reward}={self.score})'
             else:
                 return f'{self.id} ({self.score-self.bet_reward}+{self.bet_reward}={self.score})'
-        else:
+        elif not self.betted is None: # After bet deduct
+            return f'{self.id} ({self.score+self.betted}-{self.betted}={self.score})'
+        elif not self.cur_pt is None: # After score rank eval
+            return f'{self.id} ({self.score-self.cur_pt}+{self.cur_pt}={self.score})'
+        elif not self.card_spent is None: # After buy card (and take bet)
+            return f'{self.id} ({self.score+self.card_spent}-{self.card_spent}={self.score})'
+        elif not self.took_bet is None: # After take bet + without buy card
+            return f'{self.id} ({self.score})'
+        else: # Before take bet
             return f'{self.id} ({self.score})'
     
 class PlayerManager:
@@ -95,6 +107,8 @@ class PlayerManager:
             raise GameplayError("Score should be a integer")
         player.playing_score = score
 
+    
+    # Compare funcs:
     def default_ranking_cmp(self, a:Player, b:Player):
         if not a.rank is None and not b.rank is None and a.rank != b.rank:
             return b.rank - a.rank
@@ -104,7 +118,20 @@ class PlayerManager:
             return b.score - a.score
         else:
             return a.id > b.id
+    
+    def score_cmp(self, a:Player, b:Player):
+        if a.score != b.score:
+            return a.score - b.score
+        else:
+            return a.id > b.id
+    
+    def playscore_cmp(self, a:Player, b:Player):
+        if a.playing_score != b.playing_score:
+            return a.playing_score - b.playing_score
+        else:
+            return a.id > b.id
 
+    # Play rank to score:
     def default_rank_to_score(self, member):
         pt = (len(member)+1)//2
         for i, player in enumerate(member):
@@ -142,6 +169,7 @@ class PlayerManager:
             half_score = (len(self.player_list)+1)//2
             for player in deduct_list:
                 player.score -= half_score
+                player.card_spent = half_score
     
     # evaluate function
     def preprocess_playing_score(self, process_func):

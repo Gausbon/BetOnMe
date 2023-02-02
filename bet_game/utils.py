@@ -69,7 +69,8 @@ class TrieNode:
 def log(s:str):
     print(s)
 
-
+def divideline():
+    log('=============================')
 
 '''
 def check_ndarray(value):
