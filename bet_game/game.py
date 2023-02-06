@@ -235,7 +235,7 @@ class Game:
         elif self.__status == self.STATUS_104_PLAY:
             head = f'Playing {self.__current_quest.description}.\n'
         elif self.__status == self.STATUS_105_PREPROCESS:
-            head = f'Prerpocess for points deduction of bet.\n'
+            head = f'Preprocess for points deduction of bet.\n'
         elif self.__status == self.STATUS_106_EVALUATE_SCORE:
             head = f'Evaluating scores of {self.__current_quest.description}.\n'
         elif self.__status == self.STATUS_107_EVALUATE_BET:
