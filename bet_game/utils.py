@@ -1,3 +1,5 @@
+import datetime
+
 class GameplayError(Exception):
     pass
 
@@ -64,3 +66,21 @@ class TrieNode:
                 self.children[id[0]] = TrieNode()
             child = self.children[id[0]]
             child.insert(id[1:], player)
+
+class Logger:
+    __file_name = None
+    __file = None
+    
+    def reset_log(self, game_type='arcaea'):
+        if not self.__file is None:
+            self.__file.close()
+        self.__file_name = f'bet_on_me_{game_type}_' + datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S_%f.txt')
+        self.__file = open('log/'+ self.__file_name, 'w')
+
+    def log(self, s, file=True):
+        print(s)
+        if file:
+            self.__file.write(str(s)+'\n')
+
+    def __del__(self):
+        self.__file.close()

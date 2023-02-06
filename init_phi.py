@@ -39,6 +39,9 @@ def event():
 def quest():
     game.draw_quest()
 
+def verify():
+    game.verify()
+
 def bet(id1, id2, stake=1):
     game.bet(id1, id2, stake)
 
@@ -46,5 +49,8 @@ def play(id, score):
     game.play(id, score)
 
 def result():
+    game.evaluate_preprocess()
     game.evaluate_score()
     game.evaluate_bet()
+    game.end_turn()
+

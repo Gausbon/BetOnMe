@@ -11,6 +11,7 @@ start()
 # turn 1
 event()
 quest()
+verify()
 
 bet('p1', 'p3', 2)
 bet('p2', 'p3', 1)
@@ -30,6 +31,7 @@ result()
 event()
 quest()
 quest()
+verify()
 
 bet('p1', None)
 bet('p1', 'p3', 1)
@@ -56,6 +58,7 @@ start()
 event()
 quest()
 quest()
+verify()
 
 bet('p1', None)
 bet('p1', 'p2', 3)

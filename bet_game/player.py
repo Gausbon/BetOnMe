@@ -12,31 +12,39 @@ class Player:
         self.reset_turn()
         
     def reset_turn(self):
-        self.took_bet = False
-        self.bet_id = None
-        self.bet_score = None
-        self.betted = None
+        self.took_bet = False # Had player bet somebody else?
+        self.bet_id = None # Who had the player bet?
+        self.stake = None # This round's stake.
+        self.betted = None # How many people betted on the player? (For deduct)
+        self.bet_reward = None # Points that the player earned in this turn's bet.
 
-        self.played = False
-        self.playing_score = None
-        self.cur_pt = None
-        self.rank = None
+        self.played = False # Did the player submit the playscore?
+        self.playing_score = None # This round's playscore.
+        self.rank = None # The player's rank in this turn's playing.
+        self.cur_pt = None # Points that the player earned in this turn's playing.
 
     def __lt__(self, other):
         return self.score < other.score
 
     def __str__(self):
-        if not self.betted is None:
-            return f'{self.id} ({self.score+self.betted-self.cur_pt}+{self.cur_pt}-{self.betted}={self.score})'
-        elif not self.cur_pt is None:
+        if not self.bet_reward is None: # After bet eval + without card reward
+            if self.bet_reward < 0:
+                return f'{self.id} ({self.score-self.bet_reward}-{-self.bet_reward}={self.score})'
+            else:
+                return f'{self.id} ({self.score-self.bet_reward}+{self.bet_reward}={self.score})'
+        elif not self.cur_pt is None: # After score rank eval
             return f'{self.id} ({self.score-self.cur_pt}+{self.cur_pt}={self.score})'
-        else:
+        elif not self.betted is None: # After bet deduct
+            return f'{self.id} ({self.score+self.betted}-{self.betted}={self.score})'
+        elif not self.took_bet is None: # After take bet + without buy card
+            return f'{self.id} ({self.score})'
+        else: # Before take bet
             return f'{self.id} ({self.score})'
     
 class PlayerManager:
     def __init__(self):
-        self.betted_decrease = True
-        self.bet_failed_decrease = True
+        self.betted_deduct = True
+        self.bet_failed_deduct = True
         self.player_list = []
         self.player_id_trie = TrieNode()
 
@@ -46,21 +54,19 @@ class PlayerManager:
     def reset_round(self):
         for player in self.player_list:
             player.reset_round()
-        self.reset_turn
+        self.reset_turn()
 
     # reset function
     def reset_turn(self):
         for player in self.player_list:
             player.reset_turn()
-        self.betted_decrease = True
-        self.bet_failed_decrease = True
-        self.double_reward = False
-        self.collision = False
-        self.popular = False
-        self.patient = False
-        self.set_score = self.default_set_score
-        self.ranking_cmp = self.default_ranking_cmp
-        self.rank_to_score = self.default_rank_to_score
+        self.betted_deduct = True # if players get betted, the score will be deducted
+        self.after_event = [] # event at the end of the turn
+        self.bet_failed_deduct = True # if players bets failed, the score will be deducted
+        self.double_reward = False # if players bets success, the reward will get double 
+        self.set_score = self.default_set_score # initialize set score function
+        self.score_cmp = self.default_score_cmp # initialize score compare function
+        self.rank_to_score = self.default_rank_to_score # initialize from rank to score function
 
     @property
     def player_num(self):
@@ -91,7 +97,7 @@ class PlayerManager:
             raise GameplayError("Score should be an integer")
         player.playing_score = score
 
-    def default_ranking_cmp(self, a:Player, b:Player):
+    def default_score_cmp(self, a:Player, b:Player):
         if not a.rank is None and not b.rank is None and a.rank != b.rank:
             return b.rank - a.rank
         elif a.playing_score != b.playing_score:
@@ -110,19 +116,20 @@ class PlayerManager:
             if pt > 0:
                 pt -= 1
 
-    # evaluate function
-    def evaluate_playing_score(self):
-        self.player_list = sorted(self.player_list, reverse=True, 
-            key=cmp_to_key(self.ranking_cmp))
-        if self.betted_decrease:
+    def preprocess_bet_score(self):
+        if self.betted_deduct:
             for player in self.player_list:
                 if player.bet_id:
                     bet_player = self.find_player(player.bet_id)
                     bet_player.score -= 1
                     if bet_player.betted is None:
-                        bet_player.betted = 1
-                    else:
-                        bet_player.betted += 1
+                        bet_player.betted = 0
+                    bet_player.betted += 1
+
+    # evaluate function
+    def evaluate_playing_score(self):
+        self.player_list = sorted(self.player_list, reverse=True, 
+            key=cmp_to_key(self.score_cmp))
         self.rank_to_score(self.player_list)
         
     def evaluate_bet_score(self):
@@ -134,50 +141,26 @@ class PlayerManager:
             if player.bet_id:
                 bet_player = self.find_player(player.bet_id)
                 if bet_player.score == max_score:
+                    score_list[i] = player.stake
                     if self.double_reward:
-                        score_list[i] = player.stake * 2
-                    else:
-                        score_list[i] = player.stake
-                elif self.bet_failed_decrease:
+                        score_list[i] += player.stake
+                elif self.bet_failed_deduct:
                     score_list[i] = -player.stake
 
         for i, player in enumerate(self.player_list):
+            player.bet_reward = score_list[i]
             player.score += score_list[i]
-        
-        if self.collision or self.popular:
-            collision_dict = {}
-            max_betted = 0
-            for i, player in enumerate(self.player_list):
-                if player.bet_id:
-                    if player.bet_id in collision_dict.keys():
-                        collision_dict[player.bet_id] += 1
-                    else:
-                        collision_dict[player.bet_id] = 1
-                    if collision_dict[player.bet_id] >= max_betted:
-                        max_betted = collision_dict[player.bet_id]
-
-            for i, player in enumerate(self.player_list):
-                if self.collision:
-                    if player.bet_id:
-                        player.score -= (collision_dict[player.bet_id]-1)
-                if self.popular:
-                    if player.id in collision_dict and collision_dict[player.id] == max_betted:
-                        player.score += 2 * collision_dict[player.id]
-
-        if self.patient:
-            min_score = None
-            for player in self.player_list:
-                if min_score is None or player.score < min_score:
-                    min_score = player.score
-            for player in self.player_list:
-                if player.score == min_score:
-                    player.score += self.player_num
 
         self.player_list = sorted(self.player_list, reverse=True)
+
+    def evaluate_end_event(self):
+        for event in self.after_event:
+            event()
 
     @property
     def player_num(self):
         return len(self.player_list)
+
 
 # test
 if __name__ == '__main__':
